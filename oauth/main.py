@@ -182,8 +182,8 @@ class ProtectedResourceHandler(BaseHandler):
 			if not ResourceTable().check_valid_consumer('res1', consumer.key):
 				self.send_oauth_error(oauth.OAuthError('consumer may not access this resource'))
 				return
+			logging.debug('token string: '+token.to_string())
 
-			self.response.out.write(UserTable().get_username(token.user) + ': <br />')
 			self.response.out.write(str(params))
 		except oauth.OAuthError, err:
 			self.send_oauth_error(err)
@@ -206,7 +206,9 @@ class ProtectedResource2Handler(BaseHandler):
 				self.send_oauth_error(oauth.OAuthError('consumer may not access this resource'))
 				return
 
-			self.response.out.write(UserTable().get_username(token.user) + ': <br />')
+			uname = Token().get_username(token.key)
+
+			self.response.out.write('User: ' + uname)
 			self.response.out.write(str(params))
 		except oauth.OAuthError, err:
 			self.send_oauth_error(err)
@@ -229,7 +231,6 @@ class ProtectedResource3Handler(BaseHandler):
 				self.send_oauth_error(oauth.OAuthError('consumer may not access this resource'))
 				return
 
-			self.response.out.write(UserTable().get_username(token.user) + ': <br />')
 			self.response.out.write(str(params))
 		except oauth.OAuthError, err:
 			self.send_oauth_error(err)

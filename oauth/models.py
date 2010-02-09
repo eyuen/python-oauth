@@ -203,6 +203,32 @@ class Token(db.Model):
 
 		return False
 	#end update_token_callback
+
+	# get user key
+	def get_user_key(self, ckey):
+		res = self.gql("WHERE ckey = :1", ckey).get()
+
+		if not res:
+			return False
+		else:
+			return res.user
+	# end get_user_key class
+
+	# get user name
+	def get_username(self, ckey):
+		res = self.gql("WHERE ckey = :1", ckey).get()
+
+		if not res:
+			return False
+
+		res = UserTable().gql("WHERE ckey = :1", res.user).get()
+
+		if not res:
+			return False
+		else:
+			return res.username
+	# end get_username class
+
 # End Token class
 
 

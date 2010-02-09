@@ -73,7 +73,7 @@ class BaseHandler(webapp.RequestHandler):
 		self.paramdict = {}
 		for j in self.request.arguments():
 			self.paramdict[j] = self.request.get(j)
-		logging.debug(self.paramdict)
+		logging.debug('parameters received: ' +str(self.paramdict))
 
 		# construct the oauth request from the request parameters
 		try:
@@ -111,6 +111,8 @@ class RequestTokenHandler(BaseHandler):
 # required fields: 
 # - username: string 
 # - password: string, sha1 of plaintext password
+# TODO: Change this back into a normal user authorize....
+#	redirect to login page, have user authorize app, and redirect to callback if one provided...
 class UserAuthorize(BaseHandler):
 	def handler(self):
 		oauth_request = self.construct_request('Authorize')
@@ -119,6 +121,8 @@ class UserAuthorize(BaseHandler):
 			return
 	
 		try:
+			username = None
+			password = None
 			# set by construct_request
 			if 'username' in self.paramdict:
 				username = self.paramdict['username']
@@ -166,6 +170,64 @@ class AccessTokenHandler(BaseHandler):
 			self.send_oauth_error(err)
 	# end handler method
 # End AccessTokenHandler Class
+
+# cheat for mobile phone so no back and forth with redirects...
+# access as if fetching request token
+# also send username, sha1 of password
+# returns access token
+class AuthorizeAccessHandler(BaseHandler):
+	def handler(self):
+		oauth_request = self.construct_request('AuthorizeAccess')
+		if not oauth_request:
+			self.send_oauth_error(oauth.OAuthError('could not create oauth_request'))
+			return
+
+		try:
+			# request token
+			token = self.oauth_server.fetch_request_token(oauth_request)
+			logging.debug('Request Token created: ' + token.to_string())
+
+			username = None
+			password = None
+
+			# check user 
+			if 'username' in self.paramdict:
+				username = self.paramdict['username']
+			if 'password' in self.paramdict:
+				password = self.paramdict['password']
+
+			if not username or not password:
+				self.response.set_status(401, 'missing username or password')
+				logging.error('missing username or password')
+				return
+
+			ukey = UserTable().check_valid_password(username, password)
+
+			if not ukey:
+				self.response.set_status(401, 'incorrect username or password')
+				logging.error('incorrect username or password')
+				return
+
+			# perform user authorize
+			token = self.oauth_server.authorize_token(token, ukey)
+			logging.debug('Token authorized: ' + token.to_string())
+
+			# create access token
+			consumer = Consumer().get_consumer(oauth_request.get_parameter('oauth_consumer_key'))
+
+			oauth_request.set_parameter('oauth_verifier', token.verifier)
+			oauth_request.set_parameter('oauth_token', token.key)
+
+			oauth_request.sign_request(oauth.OAuthSignatureMethod_PLAINTEXT(), consumer, token)
+
+			logging.debug('Current OAuth Param: ' + str(oauth_request.parameters))
+			token = self.oauth_server.fetch_access_token(oauth_request)
+
+			self.response.out.write(token.to_string())
+		except oauth.OAuthError, err:
+			self.send_oauth_error(err)
+	# end handler method
+# End AuthorizeAccessHandler Class
 
 # res1
 class ProtectedResourceHandler(BaseHandler):
@@ -339,6 +401,14 @@ class ConfirmUser(webapp.RequestHandler):
 		self.response.out.write('user added')
 # End ConfirmUser class
 
+class LoginHandler(webapp.RequestHandler):
+	pass
+# End LoginHandler class
+
+class ConfirmLoginHandler(webapp.RequestHandler):
+	pass
+# End ConfirmLoginHandler class
+
 class test(webapp.RequestHandler):
 	def get(self):
 		self.handle()
@@ -356,10 +426,13 @@ def main():
 										('/some_resource', ProtectedResourceHandler),
 										('/some_resource2', ProtectedResource2Handler),
 										('/some_resource3', ProtectedResource3Handler),
+										('/authorize_access', AuthorizeAccessHandler),
 										('/create_consumer', CreateConsumer),
 										('/get_consumer', GetConsumer),
 										('/create_user', CreateUser),
 										('/confirm_user', ConfirmUser),
+										('/login', LoginHandler),
+										('/confirmlogin', ConfirmLoginHandler),
 										('/', test)],
 									debug=True)
 	util.run_wsgi_app(application)

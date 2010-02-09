@@ -368,7 +368,7 @@ class OAuthRequest(object):
 
 class OAuthServer(object):
     """A worker to check the validity of a request against a data store."""
-    timestamp_threshold = 300 # In seconds, five minutes.
+    timestamp_threshold = 300 +3600 # In seconds, five minutes. + an hour because our server is messed up and I cant change it...
     version = VERSION
     signature_methods = None
     data_store = None
